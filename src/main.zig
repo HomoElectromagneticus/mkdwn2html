@@ -39,7 +39,6 @@ fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayListAligned(Node, null))
     // handle empty input
     if (markdown.len == 0) return; 
 
-    var kind: Type = Type.text;
     var header_depth: u8 = 0;
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -48,6 +47,37 @@ fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayListAligned(Node, null))
 
     // go through the source character-by-character
     for (markdown, 0..) |character, index| {
+        // HEADERS
+        // if we hit a '#' and one of the following is true:
+        if (character == '#') {
+            // we're at the first character of a file
+            if (index == 0) {
+                header_depth = 1;
+                try nodes.append(.{
+                    .kind = Type.header,
+                    .level = header_depth,
+                    .resource = "",
+                });
+                continue;
+            }
+            // the previous character was a newline
+            if (markdown[index - 1] == '\n') {
+                header_depth = 1;
+                try nodes.append(.{
+                    .kind = Type.header,
+                    .level = header_depth,
+                    .resource = "",
+                });
+                continue;
+            }
+            // previous character was a '#' and we already in "header mode"
+            if (markdown[index - 1] == '#' and header_depth > 0) {
+                header_depth += 1;
+                nodes.items[nodes.items.len - 1].level = header_depth;
+                continue;
+            } 
+        }
+
         // BOLD AND ITALICS
         // if we hit a '*' or a '_', we need to insert either an italics node
         // or a bold node depending on the previous character
@@ -58,7 +88,7 @@ fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayListAligned(Node, null))
                 _ = nodes.pop();
                 try nodes.append(.{
                     .kind = Type.bold,
-                    .level = 0,
+                    .level = header_depth,
                     .resource = "",
                 });
             // if it's not repeated, then we save all the text up until now 
@@ -69,7 +99,7 @@ fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayListAligned(Node, null))
                 }
                 try nodes.append(.{
                     .kind = Type.italics,
-                    .level = 0,
+                    .level = header_depth,
                     .resource = "",
                 });
             }
@@ -82,15 +112,22 @@ fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayListAligned(Node, null))
             if (text_buffer.items.len > 0) {
                try nodes.append(Node.init_text(try text_buffer.toOwnedSlice()));
             }
+            // add a header node if this line has a header node
+            if (header_depth > 0) {
+                try nodes.append(.{
+                    .kind = Type.header,
+                    .level = header_depth,
+                    .resource = "",
+                });
+            } 
             // and we need to append a newline node
             try nodes.append(.{
                 .kind = Type.newline,
-                .level = 0,
+                .level = header_depth,
                 .resource = "",
             });
             // reset the parameters for the next node (we don't need to do this
             // for the text, since `toOwnedSlice()` takes care of that)
-            kind = Type.text;
             header_depth = 0;
             // move on to the next character
             continue;
@@ -131,7 +168,7 @@ pub fn main() !void {
     const markdown = try input_file.readToEndAlloc(gpa.allocator(), max_bytes);
     defer gpa.allocator().free(markdown);
 
-    // print a copy of the markdown for debugging
+    // print a copy of the test markdown for debugging
     try stdout.print("Markdown input:\n{s}", .{markdown});
 
     // we'll need to allocate more memory to build the list of markdown nodes
@@ -140,10 +177,14 @@ pub fn main() !void {
 
     // parse markdown into nodes
     try parseMarkdown(markdown, &nodes);
-
+    
+    try stdout.print("\nParsed output:\n", .{});
     for (nodes.items) |node| {
-        if (node.kind == Type.newline) try stdout.print("\n", .{});
-        try stdout.print("{s} ", .{@tagName(node.kind)});
+        if (node.kind == Type.newline) {
+            try stdout.print("\n", .{});
+            continue;
+        }
+        try stdout.print("{s}{d} ", .{@tagName(node.kind), node.level});
     }
     
     try bw.flush(); // don't forget to flush!
