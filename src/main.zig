@@ -1,7 +1,8 @@
 const std = @import("std");
+const parseMarkdown = @import("parser.zig").parseMarkdown;
 
 // the types of possible markdown objects i care about tokenizing
-const Type = enum {
+pub const Kind = enum {
     newline,
     text,
     header,
@@ -13,14 +14,14 @@ const Type = enum {
 };
 
 // a markdown node
-const Node = struct {
-    kind: Type,
+pub const Node = struct {
+    kind: Kind,
     level: u8 = 0,
     resource: []const u8 = "",
 
-    fn init_text(raw_text: []const u8) Node {
+    pub fn init_text(raw_text: []const u8) Node {
         return Node{
-            .kind = Type.text,
+            .kind = Kind.text,
             .level = 0,
             .resource = raw_text,
         };
@@ -29,120 +30,10 @@ const Node = struct {
 
 fn appendTextNode(raw_text: []const u8, nodes: *std.ArrayListAligned(Node, null)) !void {
     try nodes.append(.{
-        .kind = Type.text,
+        .kind = Kind.text,
         .level = 0,
         .resource = raw_text,
     });
-}
-
-fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayListAligned(Node, null)) !void {
-    // handle empty input
-    if (markdown.len == 0) return; 
-
-    var header_depth: u8 = 0;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    var text_buffer = std.ArrayList(u8).init(gpa.allocator());
-    defer text_buffer.deinit();
-
-    // go through the source character-by-character
-    for (markdown, 0..) |character, index| {
-        // HEADERS
-        // if we hit a '#' and one of the following is true:
-        if (character == '#') {
-            // we're at the first character of a file
-            if (index == 0) {
-                header_depth = 1;
-                try nodes.append(.{
-                    .kind = Type.header,
-                    .level = header_depth,
-                    .resource = "",
-                });
-                continue;
-            }
-            // the previous character was a newline
-            if (markdown[index - 1] == '\n') {
-                header_depth = 1;
-                try nodes.append(.{
-                    .kind = Type.header,
-                    .level = header_depth,
-                    .resource = "",
-                });
-                continue;
-            }
-            // previous character was a '#' and we already in "header mode"
-            if (markdown[index - 1] == '#' and header_depth > 0) {
-                header_depth += 1;
-                nodes.items[nodes.items.len - 1].level = header_depth;
-                continue;
-            } 
-        }
-
-        // BOLD AND ITALICS
-        // if we hit a '*' or a '_', we need to insert either an italics node
-        // or a bold node depending on the previous character
-        if (character == '*' or character == '_') {
-            // if the '*' or the '_' is repeated, then we need to remove the 
-            // italics node we've made just before and add a bold node
-            if (character == markdown[index - 1]) {
-                _ = nodes.pop();
-                try nodes.append(.{
-                    .kind = Type.bold,
-                    .level = header_depth,
-                    .resource = "",
-                });
-            // if it's not repeated, then we save all the text up until now 
-            // (if there is any) and create an italics node
-            } else {
-                if (text_buffer.items.len > 0) {
-                    try nodes.append(Node.init_text(try text_buffer.toOwnedSlice()));
-                }
-                try nodes.append(.{
-                    .kind = Type.italics,
-                    .level = header_depth,
-                    .resource = "",
-                });
-            }
-            continue;
-        }
-
-        // NEWLINE
-        // if we hit a newline, then we need to make the right node
-        if (character == '\n') {
-            if (text_buffer.items.len > 0) {
-               try nodes.append(Node.init_text(try text_buffer.toOwnedSlice()));
-            }
-            // add a header node if this line has a header node
-            if (header_depth > 0) {
-                try nodes.append(.{
-                    .kind = Type.header,
-                    .level = header_depth,
-                    .resource = "",
-                });
-            } 
-            // and we need to append a newline node
-            try nodes.append(.{
-                .kind = Type.newline,
-                .level = header_depth,
-                .resource = "",
-            });
-            // reset the parameters for the next node (we don't need to do this
-            // for the text, since `toOwnedSlice()` takes care of that)
-            header_depth = 0;
-            // move on to the next character
-            continue;
-        }
-
-        // REGULAR TEXT
-        try text_buffer.append(character);
-    }    
-}
-
-test "empty input" {
-    var test_html = std.ArrayList(Node).init(std.testing.allocator);
-    defer test_html.deinit();
-    try parseMarkdown("", &test_html);
-    try std.testing.expectEqual(0, test_html.items.len);
 }
 
 pub fn main() !void {
@@ -180,7 +71,7 @@ pub fn main() !void {
     
     try stdout.print("\nParsed output:\n", .{});
     for (nodes.items) |node| {
-        if (node.kind == Type.newline) {
+        if (node.kind == Kind.newline) {
             try stdout.print("\n", .{});
             continue;
         }
