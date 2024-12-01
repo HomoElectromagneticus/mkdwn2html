@@ -1,7 +1,8 @@
-# header level 1
+# Header 1
 
-## header level 2
+Sample text 1
 
-Test markdown file content
-Test _italics_ rendering
-Test **bold** rendering
+## Header 2
+
+Some _italics_ text.
+Some **bold** text.
