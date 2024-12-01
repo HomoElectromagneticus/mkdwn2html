@@ -28,14 +28,6 @@ pub const Node = struct {
     }
 };
 
-fn appendTextNode(raw_text: []const u8, nodes: *std.ArrayListAligned(Node, null)) !void {
-    try nodes.append(.{
-        .kind = Kind.text,
-        .level = 0,
-        .resource = raw_text,
-    });
-}
-
 pub fn main() !void {
     // stdout is for the actual output of your application, for example if you
     // are implementing gzip, then only the compressed bytes should be sent to
@@ -75,7 +67,7 @@ pub fn main() !void {
             try stdout.print("\n", .{});
             continue;
         }
-        try stdout.print("{s}{d} ", .{@tagName(node.kind), node.level});
+        try stdout.print("{s} ", .{@tagName(node.kind)});
     }
     
     try bw.flush(); // don't forget to flush!
