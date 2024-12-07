@@ -31,7 +31,6 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
                 try nodes.append(.{
                     .kind = Kind.header,
                     .level = header_depth,
-                    .resource = "",
                 });
                 last_pos = current_pos + 1;
                 continue;
@@ -49,15 +48,23 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
         // if we hit a '*' or a '_', we need to insert either an italics node
         // or a bold node depending on the previous character
         if (character == '*' or character == '_') {
+            // if the character is the first one in the input, we know we need
+            // to make an italics node
+            if (current_pos == 0) {
+                try nodes.append(.{
+                    .kind = Kind.italics,
+                    .level = header_depth,
+                });
+                last_pos = current_pos + 1;
+                continue;
+            } 
             // if the '*' or the '_' is repeated, then we need to remove the 
             // italics node we've made just before and add a bold node
-            // TODO: will panic if '*' or '_' is the first char in a file!
             if (character == markdown[current_pos - 1]) {
                 _ = nodes.pop();
                 try nodes.append(.{
                     .kind = Kind.bold,
                     .level = header_depth,
-                    .resource = "",
                 });
             // if it's not repeated, then we save all the text up until now 
             // (if there is any) and create an italics node
@@ -72,7 +79,6 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
                 try nodes.append(.{
                     .kind = Kind.italics,
                     .level = header_depth,
-                    .resource = "",
                 });
             }
             last_pos = current_pos + 1;
@@ -82,7 +88,10 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
         // NEWLINE
         // if we hit a newline, then we need to make the right nodes
         if (character == '\n') {
-            if (last_pos != current_pos) {
+            // make a text node if there is one to make (the minus 1 term comes
+            // from the fact that the '\n' character is itself a position in
+            // the input)
+            if (last_pos < ( current_pos - 1)) {
                try nodes.append(.{
                    .kind = Kind.text,
                    .level = header_depth,
@@ -96,7 +105,6 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
                 try nodes.append(.{
                     .kind = Kind.header,
                     .level = header_depth,
-                    .resource = "",
                 });
                 header_depth = 0;
             } 
@@ -104,7 +112,6 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
             try nodes.append(.{
                 .kind = Kind.newline,
                 .level = header_depth,
-                .resource = "",
             });
             // move on to the next character
             continue;
@@ -246,3 +253,24 @@ test "handles newlines" {
 
     try std.testing.expectEqualStrings("line 1\nline 2", concatenated);
 }
+
+test "* is the first character" {
+    const test_text: []const u8 = "*italics*";
+    const allocator = std.testing.allocator;
+
+    var list_nodes = std.ArrayList(Node).init(allocator);
+    defer list_nodes.deinit();
+
+    try parseMarkdown(test_text, &list_nodes);
+
+    var strings = std.ArrayList(u8).init(allocator);
+    defer strings.deinit();
+
+    for (list_nodes.items) |node| try strings.appendSlice(node.resource);
+
+    const concatenated = try strings.toOwnedSlice();
+    defer allocator.free(concatenated);
+
+    try std.testing.expectEqualStrings("italics", concatenated);
+}
+
