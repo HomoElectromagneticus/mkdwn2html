@@ -2,9 +2,9 @@ const std = @import("std");
 const Node = @import("main.zig").Node;
 const Kind = @import("main.zig").Kind;
 
-pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
+pub fn lexMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
     // handle empty input
-    if (markdown.len == 0) return; 
+    if (markdown.len == 0) return;
 
     var header_depth: u8 = 0;
     var last_pos: usize = 0;
@@ -41,7 +41,7 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
                 nodes.items[nodes.items.len - 1].level = header_depth;
                 last_pos = current_pos + 1;
                 continue;
-            } 
+            }
         }
 
         // BOLD AND ITALICS
@@ -57,8 +57,8 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
                 });
                 last_pos = current_pos + 1;
                 continue;
-            } 
-            // if the '*' or the '_' is repeated, then we need to remove the 
+            }
+            // if the '*' or the '_' is repeated, then we need to remove the
             // italics node we've made just before and add a bold node
             if (character == markdown[current_pos - 1]) {
                 _ = nodes.pop();
@@ -66,8 +66,8 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
                     .kind = Kind.bold,
                     .level = header_depth,
                 });
-            // if it's not repeated, then we save all the text up until now 
-            // (if there is any) and create an italics node
+                // if it's not repeated, then we save all the text up until now
+                // (if there is any) and create an italics node
             } else {
                 if (last_pos != current_pos) {
                     try nodes.append(.{
@@ -91,15 +91,15 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
             // make a text node if there is one to make (the minus 1 term comes
             // from the fact that the '\n' character is itself a position in
             // the input)
-            if (last_pos < ( current_pos - 1)) {
-               try nodes.append(.{
-                   .kind = Kind.text,
-                   .level = header_depth,
-                   .resource = markdown[last_pos..current_pos],
-               });
-               last_pos = current_pos;
+            if (last_pos < (current_pos - 1)) {
+                try nodes.append(.{
+                    .kind = Kind.text,
+                    .level = header_depth,
+                    .resource = markdown[last_pos..current_pos],
+                });
+                last_pos = current_pos;
             }
-            // add a header node and reset the header depth if this line has 
+            // add a header node and reset the header depth if this line has
             // a header node
             if (header_depth > 0) {
                 try nodes.append(.{
@@ -107,7 +107,7 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
                     .level = header_depth,
                 });
                 header_depth = 0;
-            } 
+            }
             // and we need to append a newline node
             try nodes.append(.{
                 .kind = Kind.newline,
@@ -130,7 +130,7 @@ pub fn parseMarkdown(markdown: []const u8, nodes: *std.ArrayList(Node)) !void {
 test "empty input" {
     var list_nodes = std.ArrayList(Node).init(std.testing.allocator);
     defer list_nodes.deinit();
-    try parseMarkdown("", &list_nodes);
+    try lexMarkdown("", &list_nodes);
     try std.testing.expectEqual(0, list_nodes.items.len);
 }
 
@@ -141,7 +141,7 @@ test "simple text" {
     var list_nodes = std.ArrayList(Node).init(allocator);
     defer list_nodes.deinit();
 
-    try parseMarkdown(test_text, &list_nodes);
+    try lexMarkdown(test_text, &list_nodes);
 
     var strings = std.ArrayList(u8).init(allocator);
     defer strings.deinit();
@@ -161,7 +161,7 @@ test "confirm swallows '*' around italics" {
     var list_nodes = std.ArrayList(Node).init(allocator);
     defer list_nodes.deinit();
 
-    try parseMarkdown(test_text, &list_nodes);
+    try lexMarkdown(test_text, &list_nodes);
 
     var strings = std.ArrayList(u8).init(allocator);
     defer strings.deinit();
@@ -181,7 +181,7 @@ test "confirm swallows '**' around bold" {
     var list_nodes = std.ArrayList(Node).init(allocator);
     defer list_nodes.deinit();
 
-    try parseMarkdown(test_text, &list_nodes);
+    try lexMarkdown(test_text, &list_nodes);
 
     var strings = std.ArrayList(u8).init(allocator);
     defer strings.deinit();
@@ -201,7 +201,7 @@ test "confirm swallows '#' at first character of a line" {
     var list_nodes = std.ArrayList(Node).init(allocator);
     defer list_nodes.deinit();
 
-    try parseMarkdown(test_text, &list_nodes);
+    try lexMarkdown(test_text, &list_nodes);
 
     var strings = std.ArrayList(u8).init(allocator);
     defer strings.deinit();
@@ -221,7 +221,7 @@ test "confirm swallows multiple '#' characters at beginning of line" {
     var list_nodes = std.ArrayList(Node).init(allocator);
     defer list_nodes.deinit();
 
-    try parseMarkdown(test_text, &list_nodes);
+    try lexMarkdown(test_text, &list_nodes);
 
     var strings = std.ArrayList(u8).init(allocator);
     defer strings.deinit();
@@ -241,7 +241,7 @@ test "handles newlines" {
     var list_nodes = std.ArrayList(Node).init(allocator);
     defer list_nodes.deinit();
 
-    try parseMarkdown(test_text, &list_nodes);
+    try lexMarkdown(test_text, &list_nodes);
 
     var strings = std.ArrayList(u8).init(allocator);
     defer strings.deinit();
@@ -261,7 +261,7 @@ test "* is the first character" {
     var list_nodes = std.ArrayList(Node).init(allocator);
     defer list_nodes.deinit();
 
-    try parseMarkdown(test_text, &list_nodes);
+    try lexMarkdown(test_text, &list_nodes);
 
     var strings = std.ArrayList(u8).init(allocator);
     defer strings.deinit();
@@ -273,4 +273,3 @@ test "* is the first character" {
 
     try std.testing.expectEqualStrings("italics", concatenated);
 }
-

@@ -1,5 +1,5 @@
 const std = @import("std");
-const parseMarkdown = @import("parser.zig").parseMarkdown;
+const lexMarkdown = @import("lexer.zig").lexMarkdown;
 
 // the types of possible markdown objects i care about tokenizing
 pub const Kind = enum {
@@ -39,7 +39,7 @@ pub fn main() !void {
     // we'll hardcode the file path and max size for now (path is relative to
     // where the program is run from, and not this file)
     const path = "src/test.md";
-    const max_bytes : u16 = 32768;      //32 kB ish
+    const max_bytes: u16 = 32768; //32 kB ish
     // open the markdown file
     const input_file = try std.fs.cwd().openFile(path, .{});
     defer input_file.close();
@@ -59,8 +59,8 @@ pub fn main() !void {
     defer nodes.deinit();
 
     // parse markdown into nodes
-    try parseMarkdown(markdown, &nodes);
-    
+    try lexMarkdown(markdown, &nodes);
+
     try stdout.print("\nParsed output:\n", .{});
     for (nodes.items) |node| {
         if (node.kind == Kind.newline) {
@@ -69,7 +69,6 @@ pub fn main() !void {
         }
         try stdout.print("{s} ", .{@tagName(node.kind)});
     }
-    
+
     try bw.flush(); // don't forget to flush!
 }
-
