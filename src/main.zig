@@ -13,14 +13,14 @@ pub const Kind = enum {
     image,
 };
 
-// a markdown node
-pub const Node = struct {
+// a markdown symbol
+pub const Symbol = struct {
     kind: Kind,
     level: u8 = 0,
     resource: []const u8 = "",
 
-    pub fn init_text(raw_text: []const u8) Node {
-        return Node{
+    pub fn init_text(raw_text: []const u8) Symbol {
+        return Symbol{
             .kind = Kind.text,
             .level = 0,
             .resource = raw_text,
@@ -54,20 +54,20 @@ pub fn main() !void {
     // print a copy of the test markdown for debugging
     try stdout.print("Markdown input:\n{s}", .{markdown});
 
-    // we'll need to allocate more memory to build the list of markdown nodes
-    var nodes = std.ArrayList(Node).init(gpa.allocator());
-    defer nodes.deinit();
+    // we'll need to allocate more memory to build the list of markdown symbols
+    var symbols = std.ArrayList(Symbol).init(gpa.allocator());
+    defer symbols.deinit();
 
-    // parse markdown into nodes
-    try lexMarkdown(markdown, &nodes);
+    // parse markdown into symbols
+    try lexMarkdown(markdown, &symbols);
 
     try stdout.print("\nParsed output:\n", .{});
-    for (nodes.items) |node| {
-        if (node.kind == Kind.newline) {
+    for (symbols.items) |symbol| {
+        if (symbol.kind == Kind.newline) {
             try stdout.print("\n", .{});
             continue;
         }
-        try stdout.print("{s} ", .{@tagName(node.kind)});
+        try stdout.print("{s} ", .{@tagName(symbol.kind)});
     }
 
     try bw.flush(); // don't forget to flush!
